@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FloodLink - Disaster Resilience & Business Continuity Platform</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f9ff',
+              100: '#e0f2fe',
+              500: '#0284c7',
+              600: '#0369a1',
+              700: '#075985',
+              900: '#0c4a6e',
+            },
+            emergency: {
+              500: '#ef4444',
+              600: '#dc2626',
+            },
+            warning: {
+              500: '#f59e0b',
+              600: '#d97706',
+            },
+            safety: {
+              500: '#10b981',
+              600: '#059669',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+    .leaflet-popup-content-wrapper {
+      border-radius: 0.75rem;
+      padding: 0.25rem;
+    }
+    .custom-auth-tab-active {
+      background-color: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 font-sans antialiased text-slate-800 min-h-screen flex flex-col justify-center items-center p-0 sm:p-4">
+
+  <div id="app-shell" class="w-full max-w-md sm:max-w-2xl lg:max-w-4xl bg-slate-50 min-h-screen sm:min-h-[880px] sm:max-h-[920px] sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden relative border border-slate-700/50">
+    
+    <!-- Top Emergency Alert Bar -->
+    <div id="emergency-banner" class="bg-amber-500 text-slate-950 px-4 py-2 flex items-center justify-between text-xs font-semibold shadow-inner transition-all duration-300">
+      <div class="flex items-center space-x-2 truncate">
+        <span class="flex h-2.5 w-2.5 relative">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-900 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-950"></span>
+        </span>
+        <span class="truncate" id="banner-text">MODERATE FLOOD WATCH: River basin level at +2.4m above baseline.</span>
+      </div>
+      <button onclick="toggleAlertModal()" class="ml-2 underline text-slate-950 hover:text-white font-bold whitespace-nowrap">View Action</button>
+    </div>
+
+    <header class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between border-b border-slate-800">
+      <div class="flex items-center space-x-2.5">
+        <div class="bg-brand-500 p-2 rounded-xl text-white shadow-md shadow-brand-500/30">
+          <i data-lucide="waves" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-extrabold tracking-tight flex items-center gap-1.5">
+            FloodLink
+            <span class="text-[10px] bg-brand-900 text-brand-100 border border-brand-500/40 px-1.5 py-0.5 rounded font-mono uppercase tracking-wide">RESILIENCE</span>
+          </h1>
+          <p id="header-user-status" class="text-[10px] text-slate-400 -mt-1">Authentication Hub</p>
+        </div>
+      </div>
+
+      <!-- Header Controls -->
+      <div class="flex items-center space-x-2">
+        <!-- Logged In User Pill (Shown when authenticated) -->
+        <div id="logged-user-pill" class="hidden flex items-center gap-2 bg-slate-800 border border-slate-700 py-1 px-2.5 rounded-xl">
+          <span id="header-role-badge" class="bg-brand-500/20 text-brand-300 border border-brand-500/30 text-[9px] font-mono px-1.5 py-0.5 rounded uppercase">Owner</span>
+          <span id="header-user-name" class="text-xs font-bold text-slate-200 truncate max-w-[100px]">Harbor Brew</span>
+        </div>
+
+        <!-- Offline Toggle Button -->
+        <button id="offline-btn" onclick="toggleOfflineMode()" class="bg-slate-800 text-slate-300 p-2 rounded-lg border border-slate-700 hover:bg-slate-700 transition" title="Simulate Offline Vault Cache">
+          <i data-lucide="wifi" id="wifi-icon" class="w-4 h-4 text-safety-500"></i>
+        </button>
+
+        <!-- Notification Bell (Active when logged in) -->
+        <button id="header-notifications-btn" onclick="toggleNotificationsModal()" class="hidden relative bg-slate-800 text-slate-300 p-2 rounded-lg border border-slate-700 hover:bg-slate-700 transition">
+          <i data-lucide="bell" class="w-4 h-4"></i>
+          <span class="absolute -top-1 -right-1 bg-emergency-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center">3</span>
+        </button>
+
+        <!-- Logout / Switch Account Button -->
+        <button id="header-logout-btn" onclick="handleLogout()" class="hidden bg-slate-800 text-slate-400 hover:text-white p-2 rounded-lg border border-slate-700 transition" title="Log Out / Switch Account">
+          <i data-lucide="log-out" class="w-4 h-4"></i>
+        </button>
+      </div>
+    </header>
+
+    <!-- Offline Status Indicator Bar -->
+    <div id="offline-bar" class="hidden bg-slate-800 text-amber-300 text-center py-1 text-[11px] font-mono border-b border-amber-500/30 flex items-center justify-center gap-1.5">
+      <i data-lucide="wifi-off" class="w-3.5 h-3.5"></i>
+      <span>OFFLINE MODE ACTIVE - Serving encrypted local vault & cached maps</span>
+    </div>
+
+    <main id="main-viewport" class="flex-1 overflow-y-auto relative bg-slate-100 p-3 sm:p-5">
+      
+      <!-- ===================================================================
+           SCREEN 1: AUTH & ONBOARDING HUB (DEFAULT INITIAL SCREEN)
+           =================================================================== -->
+      <section id="screen-auth" class="space-y-4 max-w-lg mx-auto py-2">
+        
+        <!-- Welcome Hero Box -->
+        <div class="bg-gradient-to-br from-slate-900 via-slate-800 to-brand-900 text-white p-5 rounded-2xl shadow-md border border-slate-700 text-center relative overflow-hidden">
+          <div class="absolute -right-6 -bottom-6 w-24 h-24 bg-brand-500/10 rounded-full blur-xl pointer-events-none"></div>
+          <div class="w-12 h-12 bg-brand-500/20 text-brand-300 border border-brand-500/30 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-inner">
+            <i data-lucide="shield-alert" class="w-6 h-6"></i>
+          </div>
+          <h2 class="text-xl font-black tracking-tight text-white">Community Disaster Resilience</h2>
+          <p class="text-xs text-slate-300 mt-1 max-w-xs mx-auto leading-relaxed">
+            Connect businesses, residents, and official aid in real-time before, during, and after flood events.
+          </p>
+
+          <!-- Rapid Crisis Guest Bypass Button -->
+          <div class="mt-4 pt-3 border-t border-slate-700/60">
+            <button onclick="handleEmergencyGuestLogin()" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition transform active:scale-[0.98]">
+              <i data-lucide="zap" class="w-4 h-4 fill-slate-950"></i>
+              ⚡ Rapid Crisis Access (Skip Setup)
+            </button>
+            <p class="text-[10px] text-amber-300/80 mt-1.5 font-medium">Instant access to Hazard Map & Emergency Matching during live surges</p>
+          </div>
+        </div>
+
+        <!-- Auth Mode Toggle Tabs (Login / Sign Up / Reset) -->
+        <div class="bg-slate-200 p-1 rounded-xl flex text-xs font-semibold text-slate-600">
+          <button id="auth-tab-login" onclick="switchAuthTab('login')" class="flex-1 py-2 rounded-lg transition custom-auth-tab-active">Log In</button>
+          <button id="auth-tab-signup" onclick="switchAuthTab('signup')" class="flex-1 py-2 rounded-lg transition">Sign Up / Join</button>
+          <button id="auth-tab-reset" onclick="switchAuthTab('reset')" class="flex-1 py-2 rounded-lg transition">Reset</button>
+        </div>
+
+        <!-- FORM 1A: LOGIN FORM -->
+        <div id="auth-form-login" class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <form onsubmit="handleStandardLogin(event)" class="space-y-3">
+            <div>
+              <label class="text-xs font-bold text-slate-700">Email or Phone Number</label>
+              <div class="relative mt-1">
+                <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                <input type="text" id="login-email" required value="harbor.brew@floodlink.org" placeholder="name@business.org or +1..." class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-brand-500">
+              </div>
+            </div>
+
+            <div>
+              <div class="flex justify-between items-center">
+                <label class="text-xs font-bold text-slate-700">Password</label>
+                <button type="button" onclick="switchAuthTab('reset')" class="text-[11px] text-brand-600 hover:underline">Forgot?</button>
+              </div>
+              <div class="relative mt-1">
+                <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3 top-2.5"></i>
+                <input type="password" id="login-password" required value="password123" placeholder="••••••••" class="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-brand-500">
+              </div>
+            </div>
+
+            <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-brand-600/20 flex items-center justify-center gap-1.5">
+              <i data-lucide="log-in" class="w-4 h-4"></i>
+              Log In to Portal
+            </button>
+          </form>
+
+          <!-- SSO Fast Auth Dividers -->
+          <div class="relative my-3 text-center">
+            <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-slate-200"></div></div>
+            <span class="relative bg-white px-2 text-[10px] uppercase font-bold text-slate-400">Or Continue With</span>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="handleSSOLogin('Google')" class="border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition">
+              <svg class="w-3.5 h-3.5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/></svg>
+              Google
+            </button>
+            <button onclick="handleSSOLogin('Apple')" class="border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-semibold py-2 px-3 rounded-xl flex items-center justify-center gap-2 transition">
+              <i data-lucide="apple" class="w-4 h-4 text-slate-900"></i>
+              Apple ID
+            </button>
+          </div>
+        </div>
+
+        <!-- FORM 1B: MULTI-STEP SIGN UP & ROLE ONBOARDING -->
+        <div id="auth-form-signup" class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4 hidden">
+          
+          <!-- Onboarding Progress Header -->
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <div>
+              <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-800" id="onboard-step-title">Step 1: Select Your Resilience Role</h3>
+              <p class="text-[10px] text-slate-500" id="onboard-step-desc">Customize your dashboard & disaster toolkit</p>
+            </div>
+            <span id="onboard-step-badge" class="bg-brand-50 text-brand-700 font-mono text-[10px] font-bold px-2 py-0.5 rounded-full border border-brand-200">1 of 2</span>
+          </div>
+
+          <!-- STEP 1: ROLE SELECTION CARDS -->
+          <div id="onboard-step-1" class="space-y-2">
+            <label class="block text-xs font-bold text-slate-700 mb-1">Choose Account Profile Type:</label>
+            
+            <div class="grid grid-cols-1 gap-2">
+              <div onclick="selectOnboardRole('business')" id="role-card-business" class="p-3 border-2 border-brand-500 bg-brand-50/50 rounded-xl cursor-pointer transition flex items-center space-x-3">
+                <div class="bg-brand-500 text-white p-2.5 rounded-xl">
+                  <i data-lucide="store" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1">
+                  <div class="text-xs font-bold text-slate-900">Small Business Owner</div>
+                  <p class="text-[10px] text-slate-500">Protect inventory, track shop elevation, request sandbags & dry storage.</p>
+                </div>
+                <i data-lucide="check-circle-2" id="role-check-business" class="w-5 h-5 text-brand-600"></i>
+              </div>
+
+              <div onclick="selectOnboardRole('resident')" id="role-card-resident" class="p-3 border border-slate-200 hover:border-brand-300 rounded-xl cursor-pointer transition flex items-center space-x-3">
+                <div class="bg-slate-100 text-slate-700 p-2.5 rounded-xl">
+                  <i data-lucide="home" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1">
+                  <div class="text-xs font-bold text-slate-900">Local Resident</div>
+                  <p class="text-[10px] text-slate-500">Receive neighborhood flood alerts, find open shelters, request family aid.</p>
+                </div>
+                <i data-lucide="check-circle-2" id="role-check-resident" class="w-5 h-5 text-slate-300 hidden"></i>
+              </div>
+
+              <div onclick="selectOnboardRole('volunteer')" id="role-card-volunteer" class="p-3 border border-slate-200 hover:border-brand-300 rounded-xl cursor-pointer transition flex items-center space-x-3">
+                <div class="bg-emerald-100 text-emerald-700 p-2.5 rounded-xl">
+                  <i data-lucide="heart-handshake" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1">
+                  <div class="text-xs font-bold text-slate-900">Certified Volunteer / Helper</div>
+                  <p class="text-[10px] text-slate-500">Offer 4x4 transport, sandbag hauling, medical skills, or physical labor.</p>
+                </div>
+                <i data-lucide="check-circle-2" id="role-check-volunteer" class="w-5 h-5 text-slate-300 hidden"></i>
+              </div>
+
+              <div onclick="selectOnboardRole('official')" id="role-card-official" class="p-3 border border-slate-200 hover:border-brand-300 rounded-xl cursor-pointer transition flex items-center space-x-3">
+                <div class="bg-purple-100 text-purple-700 p-2.5 rounded-xl">
+                  <i data-lucide="shield-check" class="w-5 h-5"></i>
+                </div>
+                <div class="flex-1">
+                  <div class="text-xs font-bold text-slate-900">Official Aid Partner / NGO</div>
+                  <p class="text-[10px] text-slate-500">Issue municipal bulletins, manage supply depots, verify disaster claims.</p>
+                </div>
+                <i data-lucide="check-circle-2" id="role-check-official" class="w-5 h-5 text-slate-300 hidden"></i>
+              </div>
+            </div>
+
+            <button onclick="goToOnboardStep(2)" class="w-full mt-3 bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-md">
+              <span>Next: Profile Setup</span>
+              <i data-lucide="arrow-right" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- STEP 2: CONTEXT-SENSITIVE PROFILE SETUP FORM -->
+          <div id="onboard-step-2" class="space-y-3 hidden">
+            
+            <form onsubmit="handleSignupSubmit(event)" class="space-y-3">
+              <div>
+                <label class="text-xs font-bold text-slate-700">Account Email</label>
+                <input type="email" id="signup-email" required placeholder="user@domain.com" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-brand-500">
+              </div>
+
+              <div>
+                <label class="text-xs font-bold text-slate-700">Create Password</label>
+                <input type="password" id="signup-pass" required placeholder="Minimum 8 characters" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-brand-500">
+              </div>
+
+              <!-- DYNAMIC ROLE SPECIFIC INPUT FIELDS CONTAINER -->
+              <div id="dynamic-role-fields" class="space-y-3 pt-2 border-t border-slate-100">
+                <!-- Dynamically populated via JS depending on role selected -->
+              </div>
+
+              <div class="flex items-center space-x-2 pt-1">
+                <input type="checkbox" id="terms-agree" required class="w-4 h-4 text-brand-600 rounded border-slate-300">
+                <label for="terms-agree" class="text-[11px] text-slate-600">I agree to the <a href="#" onclick="alert('FloodLink Terms of Crisis Network')" class="text-brand-600 underline">Emergency Network Terms</a></label>
+              </div>
+
+              <div class="flex items-center space-x-2 pt-2">
+                <button type="button" onclick="goToOnboardStep(1)" class="w-1/3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2.5 rounded-xl transition">
+                  Back
+                </button>
+                <button type="submit" class="w-2/3 bg-safety-600 hover:bg-safety-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-md shadow-safety-600/20 flex items-center justify-center gap-1.5">
+                  <i data-lucide="check-circle" class="w-4 h-4"></i>
+                  Complete & Launch
+                </button>
+              </div>
+            </form>
+
+          </div>
+
+        </div>
+
+        <!-- FORM 1C: PASSWORD RESET FORM -->
+        <div id="auth-form-reset" class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3 hidden">
+          <div class="text-center">
+            <h3 class="text-xs font-extrabold uppercase tracking-wider text-slate-800">Password Recovery</h3>
+            <p class="text-xs text-slate-500 mt-0.5">We will send a one-time SMS or email recovery code</p>
+          </div>
+
+          <form onsubmit="handleResetSubmit(event)" class="space-y-3">
+            <div>
+              <label class="text-xs font-bold text-slate-700">Registered Email or Phone</label>
+              <input type="text" id="reset-input" required placeholder="owner@business.org or +1..." class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-brand-500">
+            </div>
+
+            <button type="submit" class="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs py-2.5 rounded-xl transition">
+              Send Emergency Reset Code
+            </button>
+          </form>
+        </div>
+
+      </section>
+
+      <!-- ===================================================================
+           SCREEN 2: MAIN DASHBOARD (AUTHENTICATED)
+           =================================================================== -->
+      <section id="screen-dashboard" class="space-y-4 hidden">
+        
+        <!-- Welcome & User Role Card -->
+        <div class="bg-gradient-to-r from-slate-900 to-slate-800 text-white p-4 rounded-2xl shadow-sm border border-slate-800 flex items-center justify-between">
+          <div>
+            <div class="flex items-center gap-2">
+              <span id="dashboard-role-badge" class="bg-brand-500/20 text-brand-300 border border-brand-500/30 text-[10px] uppercase font-mono px-2 py-0.5 rounded-full">Small Business Owner</span>
+              <span id="dashboard-verified-badge" class="bg-safety-500/20 text-safety-400 border border-safety-500/30 text-[10px] font-mono px-2 py-0.5 rounded-full flex items-center gap-1">
+                <i data-lucide="check-circle" class="w-3 h-3"></i> Verified
+              </span>
+            </div>
+            <h2 id="dashboard-user-greeting" class="text-lg font-bold mt-1">Harbor Brew Café</h2>
+            <p id="dashboard-user-subtext" class="text-xs text-slate-400">Zone 4B • Elevation 3.2m • Basin Proximity: 180m</p>
+          </div>
+          <button onclick="switchTab('profile')" class="bg-slate-800 hover:bg-slate-700 text-xs px-3 py-2 rounded-xl border border-slate-700 text-slate-200 flex items-center gap-1">
+            <i data-lucide="sliders" class="w-3.5 h-3.5"></i>
+            Manage
+          </button>
+        </div>
+
+        <!-- Metrics Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          
+          <!-- Flood Risk Level Card -->
+          <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between text-slate-500 mb-1">
+              <span class="text-xs font-semibold">Flood Risk</span>
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500"></i>
+            </div>
+            <div class="text-xl font-extrabold text-slate-900">Elevated</div>
+            <p class="text-[11px] text-amber-600 font-medium mt-0.5">Moderate Surge Likely</p>
+          </div>
+
+          <!-- Readiness Level -->
+          <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between text-slate-500 mb-1">
+              <span class="text-xs font-semibold">Ready Score</span>
+              <i data-lucide="shield-check" class="w-4 h-4 text-brand-500"></i>
+            </div>
+            <div id="ready-score-text" class="text-xl font-extrabold text-slate-900">75%</div>
+            <div class="w-full bg-slate-100 rounded-full h-1.5 mt-2 overflow-hidden">
+              <div id="ready-score-bar" class="bg-brand-500 h-1.5 rounded-full transition-all duration-500" style="width: 75%"></div>
+            </div>
+          </div>
+
+          <!-- Open Needs Nearby -->
+          <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between text-slate-500 mb-1">
+              <span class="text-xs font-semibold">Active Requests</span>
+              <i data-lucide="hand-heart" class="w-4 h-4 text-emergency-500"></i>
+            </div>
+            <div class="text-xl font-extrabold text-slate-900">14 Posts</div>
+            <p class="text-[11px] text-slate-500 mt-0.5">Within 2.5 km</p>
+          </div>
+
+          <!-- Matched Volunteers -->
+          <div class="bg-white p-3.5 rounded-2xl shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between text-slate-500 mb-1">
+              <span class="text-xs font-semibold">Volunteers</span>
+              <i data-lucide="users" class="w-4 h-4 text-safety-500"></i>
+            </div>
+            <div class="text-xl font-extrabold text-slate-900">8 Ready</div>
+            <p class="text-[11px] text-safety-600 font-medium mt-0.5">2 Logistics Specialists</p>
+          </div>
+        </div>
+
+        <!-- Quick Action Carousel / Grid -->
+        <div>
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Primary Workflows</h3>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <button onclick="switchTab('prepare')" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm hover:border-brand-500 hover:shadow-md transition text-left group">
+              <div class="bg-brand-50 text-brand-600 p-2 rounded-lg w-fit mb-2 group-hover:bg-brand-500 group-hover:text-white transition">
+                <i data-lucide="check-square" class="w-5 h-5"></i>
+              </div>
+              <div class="text-xs font-bold text-slate-800">Checklists</div>
+              <p class="text-[10px] text-slate-500 mt-0.5">Sandbags, Docs, Assets</p>
+            </button>
+
+            <button onclick="switchTab('match'); setMatchFilter('need');" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm hover:border-emergency-500 hover:shadow-md transition text-left group">
+              <div class="bg-red-50 text-emergency-600 p-2 rounded-lg w-fit mb-2 group-hover:bg-emergency-500 group-hover:text-white transition">
+                <i data-lucide="plus-circle" class="w-5 h-5"></i>
+              </div>
+              <div class="text-xs font-bold text-slate-800">Request Aid</div>
+              <p class="text-[10px] text-slate-500 mt-0.5">Sand, Storage, Power</p>
+            </button>
+
+            <button onclick="switchTab('match'); setMatchFilter('offer');" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm hover:border-safety-500 hover:shadow-md transition text-left group">
+              <div class="bg-emerald-50 text-safety-600 p-2 rounded-lg w-fit mb-2 group-hover:bg-safety-500 group-hover:text-white transition">
+                <i data-lucide="heart-handshake" class="w-5 h-5"></i>
+              </div>
+              <div class="text-xs font-bold text-slate-800">Offer Help</div>
+              <p class="text-[10px] text-slate-500 mt-0.5">Volunteers & Gear</p>
+            </button>
+
+            <button onclick="switchTab('map')" class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm hover:border-amber-500 hover:shadow-md transition text-left group">
+              <div class="bg-amber-50 text-amber-600 p-2 rounded-lg w-fit mb-2 group-hover:bg-amber-500 group-hover:text-white transition">
+                <i data-lucide="map-pin" class="w-5 h-5"></i>
+              </div>
+              <div class="text-xs font-bold text-slate-800">Live Hazard Map</div>
+              <p class="text-[10px] text-slate-500 mt-0.5">Roads, Shelters, Water</p>
+            </button>
+          </div>
+        </div>
+
+        <!-- Real-Time Alerts & Community Feed -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <!-- Official Aid Bulletins -->
+          <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <i data-lucide="megaphone" class="w-4 h-4 text-brand-600"></i>
+                Official Municipal Bulletins
+              </h3>
+              <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono">Live Feed</span>
+            </div>
+            
+            <div class="space-y-3">
+              <div class="border-l-2 border-emergency-500 pl-3 py-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-900">Red Cross Sandbag Station Open</span>
+                  <span class="text-[10px] text-slate-400">12m ago</span>
+                </div>
+                <p class="text-xs text-slate-600 mt-0.5">Pick up limit: 20 bags per business. Located at Civic Center Plaza.</p>
+              </div>
+
+              <div class="border-l-2 border-amber-500 pl-3 py-1">
+                <div class="flex items-center justify-between">
+                  <span class="text-xs font-bold text-slate-900">River Bridge Closure Expected</span>
+                  <span class="text-[10px] text-slate-400">45m ago</span>
+                </div>
+                <p class="text-xs text-slate-600 mt-0.5">Water levels rising near East Bank. Detour via 5th St Bypass.</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rapid Community Match Preview -->
+          <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <i data-lucide="zap" class="w-4 h-4 text-amber-500"></i>
+                Urgent Community Need
+              </h3>
+              <button onclick="switchTab('match')" class="text-xs text-brand-600 font-semibold hover:underline">View All</button>
+            </div>
+
+            <div id="urgent-dashboard-match" class="bg-amber-50/60 border border-amber-200 rounded-xl p-3">
+              <div class="flex justify-between items-start">
+                <span class="bg-emergency-500 text-white text-[9px] font-bold px-1.5 py-0.5 rounded uppercase">Urgent • 0.4km</span>
+                <span class="text-[10px] text-slate-500">10m ago</span>
+              </div>
+              <h4 class="text-xs font-bold text-slate-900 mt-1.5">Dry Pallet & Box Storage Needed</h4>
+              <p class="text-xs text-slate-600 mt-0.5 line-clamp-2">Coastal Craft Bakery needs temporary dry storage for 4 pallets of flour before water enters shop.</p>
+              <div class="mt-2.5 flex items-center justify-between">
+                <span class="text-[10px] text-slate-500 font-medium">Requested by: Craft Bakery</span>
+                <button onclick="openRespondModal('Coastal Craft Bakery', 'Dry Pallet Storage')" class="bg-amber-600 hover:bg-amber-700 text-white text-xs px-2.5 py-1 rounded-lg font-semibold transition">
+                  Offer Storage
+                </button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </section>
+
+      <!-- ===================================================================
+           SCREEN 3: PREPARE HUB (CHECKLISTS, VAULT, RISK CALCULATOR)
+           =================================================================== -->
+      <section id="screen-prepare" class="space-y-4 hidden">
+        
+        <!-- Tab Navigation inside Prepare Hub -->
+        <div class="flex bg-slate-200/80 p-1 rounded-xl text-xs font-medium text-slate-600">
+          <button id="prep-subtab-checklists" onclick="setPrepareSubtab('checklists')" class="flex-1 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm font-bold transition">Action Checklists</button>
+          <button id="prep-subtab-vault" onclick="setPrepareSubtab('vault')" class="flex-1 py-1.5 rounded-lg hover:text-slate-900 transition">Digital Vault</button>
+          <button id="prep-subtab-risk" onclick="setPrepareSubtab('risk')" class="flex-1 py-1.5 rounded-lg hover:text-slate-900 transition">Risk Calculator</button>
+        </div>
+
+        <!-- SUBTAB 1: CHECKLISTS -->
+        <div id="prep-content-checklists" class="space-y-3">
+          
+          <!-- Progress Card -->
+          <div class="bg-slate-900 text-white p-4 rounded-2xl shadow-sm flex items-center justify-between">
+            <div>
+              <span class="text-[10px] uppercase font-mono text-brand-300">Phase 1: Pre-Surge Readiness</span>
+              <h3 class="text-base font-bold text-white">Business Continuity Action List</h3>
+              <p class="text-xs text-slate-400 mt-0.5">Complete items to shield inventory & staff</p>
+            </div>
+            <div class="text-right">
+              <div id="checklist-percentage" class="text-2xl font-black text-brand-400">75%</div>
+              <span id="checklist-count-text" class="text-[10px] text-slate-400">3 of 4 Done</span>
+            </div>
+          </div>
+
+          <!-- Interactive Checklist Items -->
+          <div id="checklist-container" class="space-y-2">
+            <!-- Rendered by JS -->
+          </div>
+
+          <!-- Custom Add Item Button -->
+          <button onclick="addCustomChecklistItem()" class="w-full border-2 border-dashed border-slate-300 hover:border-brand-500 hover:bg-brand-50/50 rounded-xl p-3 text-xs font-semibold text-slate-600 flex items-center justify-center gap-1.5 transition">
+            <i data-lucide="plus" class="w-4 h-4 text-brand-600"></i>
+            Add Custom Action Item
+          </button>
+        </div>
+
+        <!-- SUBTAB 2: DIGITAL VAULT -->
+        <div id="prep-content-vault" class="space-y-3 hidden">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">Digital "Flood Ready" Passport</h3>
+                <p class="text-xs text-slate-500">Encrypted offline copy of policies & inventory</p>
+              </div>
+              <span class="bg-safety-50 text-safety-700 text-[10px] border border-safety-200 font-mono px-2 py-0.5 rounded-full flex items-center gap-1">
+                <i data-lucide="lock" class="w-3 h-3"></i> AES-256 Offline
+              </span>
+            </div>
+
+            <!-- Documents List -->
+            <div id="vault-list" class="space-y-2">
+              <div class="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <div class="flex items-center space-x-2.5">
+                  <div class="bg-red-100 text-red-600 p-2 rounded-lg">
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <div class="text-xs font-bold text-slate-800">Commercial_Insurance_Policy_2026.pdf</div>
+                    <p class="text-[10px] text-slate-500">Updated 12 days ago • 2.4 MB • Synced Locally</p>
+                  </div>
+                </div>
+                <button onclick="alert('Viewing offline cached PDF')" class="text-xs text-brand-600 font-semibold hover:underline">View</button>
+              </div>
+
+              <div class="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                <div class="flex items-center space-x-2.5">
+                  <div class="bg-emerald-100 text-emerald-600 p-2 rounded-lg">
+                    <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                  </div>
+                  <div>
+                    <div class="text-xs font-bold text-slate-800">Inventory_Asset_Roster_Q3.xlsx</div>
+                    <p class="text-[10px] text-slate-500">Updated 2 days ago • 1.1 MB • Synced Locally</p>
+                  </div>
+                </div>
+                <button onclick="alert('Viewing offline asset list')" class="text-xs text-brand-600 font-semibold hover:underline">View</button>
+              </div>
+            </div>
+
+            <!-- Upload Area -->
+            <div class="mt-4">
+              <label class="border-2 border-dashed border-slate-300 hover:border-brand-500 rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer bg-slate-50/50 hover:bg-brand-50/30 transition">
+                <i data-lucide="upload-cloud" class="w-6 h-6 text-brand-500 mb-1"></i>
+                <span class="text-xs font-bold text-slate-700">Upload Critical Business Document</span>
+                <span class="text-[10px] text-slate-400 mt-0.5">Insurance policies, supplier contracts, equipment IDs</span>
+                <input type="file" onchange="simulateUpload(this)" class="hidden">
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUBTAB 3: RISK CALCULATOR -->
+        <div id="prep-content-risk" class="space-y-3 hidden">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800 mb-2">Localized Flood Vulnerability Index</h3>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+              <div>
+                <label class="text-xs font-semibold text-slate-600">Property Elevation (Meters)</label>
+                <input type="number" id="input-elevation" value="3.2" step="0.1" onchange="recalculateRisk()" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-brand-500">
+              </div>
+              <div>
+                <label class="text-xs font-semibold text-slate-600">Proximity to River Channel (Meters)</label>
+                <input type="number" id="input-distance" value="180" step="10" onchange="recalculateRisk()" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-800 focus:outline-none focus:border-brand-500">
+              </div>
+            </div>
+
+            <!-- Chart Canvas Container -->
+            <div class="h-44 w-full relative">
+              <canvas id="riskChart"></canvas>
+            </div>
+
+            <div id="risk-assessment-output" class="bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3 text-xs text-amber-900">
+              <span class="font-bold">Assessment:</span> At 3.2m elevation, water levels above 2.8m pose a <strong>68% risk of floor inundation</strong> within 4 hours of torrential surge. Immediate sandbag fortification recommended.
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ===================================================================
+           SCREEN 4: MATCH BOARD (COMMUNITY ENGINE)
+           =================================================================== -->
+      <section id="screen-match" class="space-y-4 hidden">
+        
+        <!-- Header & Action Button -->
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-extrabold text-slate-900">Community Matching Engine</h2>
+            <p class="text-xs text-slate-500">Pairing local needs with volunteers & gear</p>
+          </div>
+          <button onclick="openPostModal()" class="bg-brand-600 hover:bg-brand-700 text-white text-xs px-3 py-2 rounded-xl font-bold flex items-center gap-1.5 shadow-md shadow-brand-500/20 transition">
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            Post Request / Offer
+          </button>
+        </div>
+
+        <!-- Filter Sub-Tabs & Category Pills -->
+        <div class="space-y-2">
+          <div class="flex bg-slate-200/80 p-1 rounded-xl text-xs font-medium text-slate-600">
+            <button id="match-tab-all" onclick="filterMatchTab('all')" class="flex-1 py-1.5 rounded-lg bg-white text-slate-900 shadow-sm font-bold transition">All Postings (7)</button>
+            <button id="match-tab-needs" onclick="filterMatchTab('need')" class="flex-1 py-1.5 rounded-lg hover:text-slate-900 transition">Requests for Help (4)</button>
+            <button id="match-tab-offers" onclick="filterMatchTab('offer')" class="flex-1 py-1.5 rounded-lg hover:text-slate-900 transition">Available Offers (3)</button>
+          </div>
+
+          <!-- Category filter buttons -->
+          <div class="flex items-center space-x-1.5 overflow-x-auto pb-1 text-xs">
+            <button onclick="filterCategory('all')" class="bg-slate-800 text-white px-2.5 py-1 rounded-full whitespace-nowrap font-medium text-[11px]">All Categories</button>
+            <button onclick="filterCategory('Sandbags')" class="bg-white text-slate-700 border border-slate-200 px-2.5 py-1 rounded-full whitespace-nowrap hover:bg-slate-100 text-[11px]">⏳ Sandbags</button>
+            <button onclick="filterCategory('Storage')" class="bg-white text-slate-700 border border-slate-200 px-2.5 py-1 rounded-full whitespace-nowrap hover:bg-slate-100 text-[11px]">📦 Storage</button>
+            <button onclick="filterCategory('Transport')" class="bg-white text-slate-700 border border-slate-200 px-2.5 py-1 rounded-full whitespace-nowrap hover:bg-slate-100 text-[11px]">🚚 Transport</button>
+            <button onclick="filterCategory('Volunteers')" class="bg-white text-slate-700 border border-slate-200 px-2.5 py-1 rounded-full whitespace-nowrap hover:bg-slate-100 text-[11px]">⛑️ Volunteers</button>
+          </div>
+        </div>
+
+        <!-- Active Postings Feed -->
+        <div id="match-feed-container" class="space-y-3">
+          <!-- Dynamically Rendered by JS -->
+        </div>
+
+      </section>
+
+      <!-- ===================================================================
+           SCREEN 5: RESOURCE & HAZARD MAP
+           =================================================================== -->
+      <section id="screen-map" class="space-y-3 hidden">
+        
+        <!-- Map Controls Header -->
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-extrabold text-slate-900">Community GIS Map</h2>
+            <p class="text-xs text-slate-500">Live flood inundation, open shelters & road closures</p>
+          </div>
+          <div class="flex items-center space-x-1 text-xs">
+            <span class="inline-block w-2 h-2 rounded-full bg-emergency-500 animate-ping"></span>
+            <span class="font-mono text-[10px] text-slate-600">Updated Real-Time</span>
+          </div>
+        </div>
+
+        <!-- Layer Toggles -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+          <button onclick="toggleMapLayer('shelters')" id="layer-btn-shelters" class="bg-brand-600 text-white px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium text-[11px] border border-brand-600">
+            <i data-lucide="home" class="w-3 h-3"></i> Shelters (3)
+          </button>
+          <button onclick="toggleMapLayer('supplies')" id="layer-btn-supplies" class="bg-safety-600 text-white px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium text-[11px] border border-safety-600">
+            <i data-lucide="package" class="w-3 h-3"></i> Supply Hubs (2)
+          </button>
+          <button onclick="toggleMapLayer('hazards')" id="layer-btn-hazards" class="bg-emergency-600 text-white px-2.5 py-1 rounded-lg flex items-center gap-1 font-medium text-[11px] border border-emergency-600">
+            <i data-lucide="alert-octagon" class="w-3 h-3"></i> Closed Roads (4)
+          </button>
+        </div>
+
+        <!-- Leaflet Map Canvas Container -->
+        <div class="relative w-full h-[450px] sm:h-[500px] rounded-2xl overflow-hidden border border-slate-300 shadow-inner">
+          <div id="map" class="w-full h-full"></div>
+          
+          <!-- Map Overlay Legend -->
+          <div class="absolute bottom-3 left-3 z-[1000] bg-white/95 backdrop-blur-sm p-2.5 rounded-xl border border-slate-200 shadow-md text-[10px] space-y-1">
+            <div class="font-bold text-slate-800 border-b pb-0.5 mb-1">Map Legend</div>
+            <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span> Open Shelter</div>
+            <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Supply Pick-Up</div>
+            <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-red-500"></span> Flooded/Closed Road</div>
+            <div class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span> Volunteer Hub</div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ===================================================================
+           SCREEN 6: RECOVERY & PROFILE HUB
+           =================================================================== -->
+      <section id="screen-profile" class="space-y-4 hidden">
+        
+        <!-- Profile Details Card -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <div id="profile-avatar" class="w-12 h-12 bg-slate-900 text-brand-400 font-extrabold text-lg rounded-2xl flex items-center justify-center border border-slate-800">
+              HB
+            </div>
+            <div>
+              <h3 id="profile-name" class="text-sm font-bold text-slate-900">Harbor Brew Café</h3>
+              <p id="profile-subtext" class="text-xs text-slate-500">Reg No: #BUS-88392 • Zone 4B</p>
+              <div class="flex items-center gap-2 mt-1">
+                <span id="profile-role-tag" class="bg-safety-50 text-safety-700 text-[10px] font-mono px-2 py-0.5 rounded border border-safety-200">Small Business Owner</span>
+                <span id="profile-verified-tag" class="text-[10px] text-slate-400">Verified Account</span>
+              </div>
+            </div>
+          </div>
+          <button onclick="handleLogout()" class="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl flex items-center gap-1">
+            <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+            Log Out
+          </button>
+        </div>
+
+        <!-- Damage Assessment & Disaster Grant Finder -->
+        <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-xs font-bold uppercase tracking-wider text-slate-800">Post-Flood Business Recovery Toolkit</h3>
+            <span class="text-[10px] bg-brand-50 text-brand-700 px-2 py-0.5 rounded font-mono">Recovery Phase</span>
+          </div>
+
+          <!-- Rapid Damage Estimator Form -->
+          <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+            <div class="text-xs font-bold text-slate-800">Rapid Damage Assessment Log</div>
+            <div class="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <label class="text-[10px] text-slate-500 font-semibold">Structural Damage ($)</label>
+                <input type="number" id="damage-struct" value="1500" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-slate-800">
+              </div>
+              <div>
+                <label class="text-[10px] text-slate-500 font-semibold">Inventory Loss ($)</label>
+                <input type="number" id="damage-inv" value="3200" class="w-full bg-white border border-slate-300 rounded-lg px-2 py-1 text-slate-800">
+              </div>
+            </div>
+            <button onclick="calculateDamageReport()" class="w-full bg-slate-900 hover:bg-slate-800 text-white text-xs py-1.5 rounded-lg font-semibold transition">
+              Generate SBA/FEMA Loss Export
+            </button>
+          </div>
+
+          <!-- Small Business Grant Resource Finder -->
+          <div class="space-y-2">
+            <div class="text-xs font-bold text-slate-800">Matching Emergency Recovery Grants</div>
+            
+            <div class="p-2.5 bg-brand-50/60 border border-brand-200 rounded-xl flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-900">Municipal Micro-Grant for Small Biz</div>
+                <p class="text-[10px] text-slate-600">Up to $5,000 for immediate clean-up & restocking.</p>
+              </div>
+              <button onclick="alert('Redirecting to Municipal Grant Portal')" class="bg-brand-600 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold">Apply</button>
+            </div>
+
+            <div class="p-2.5 bg-emerald-50/60 border border-emerald-200 rounded-xl flex items-center justify-between">
+              <div>
+                <div class="text-xs font-bold text-slate-900">SBA Low-Interest Disaster Loan</div>
+                <p class="text-[10px] text-slate-600">Long-term physical & working capital disaster recovery.</p>
+              </div>
+              <button onclick="alert('Redirecting to SBA Disaster Assistance')" class="bg-safety-600 text-white text-[11px] px-2.5 py-1 rounded-lg font-bold">Apply</button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- BOTTOM NAVIGATION BAR -->
+    <nav id="bottom-nav-bar" class="bg-slate-900 border-t border-slate-800 px-2 py-2 flex items-center justify-around text-slate-400 select-none z-10">
+      
+      <button onclick="switchTab('auth')" id="nav-btn-auth" class="flex flex-col items-center gap-0.5 text-brand-400 font-bold px-3 py-1 transition">
+        <i data-lucide="key-round" class="w-5 h-5"></i>
+        <span class="text-[10px]">Auth Hub</span>
+      </button>
+
+      <button onclick="switchTab('dashboard')" id="nav-btn-dashboard" class="flex flex-col items-center gap-0.5 hover:text-slate-200 px-3 py-1 transition">
+        <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+        <span class="text-[10px]">Dashboard</span>
+      </button>
+
+      <button onclick="switchTab('prepare')" id="nav-btn-prepare" class="flex flex-col items-center gap-0.5 hover:text-slate-200 px-3 py-1 transition">
+        <i data-lucide="shield" class="w-5 h-5"></i>
+        <span class="text-[10px]">Prepare</span>
+      </button>
+
+      <button onclick="switchTab('match')" id="nav-btn-match" class="flex flex-col items-center gap-0.5 hover:text-slate-200 px-3 py-1 transition relative">
+        <i data-lucide="heart-handshake" class="w-5 h-5"></i>
+        <span class="text-[10px]">Match</span>
+        <span class="absolute top-1 right-3 bg-emergency-500 w-2 h-2 rounded-full"></span>
+      </button>
+
+      <button onclick="switchTab('map')" id="nav-btn-map" class="flex flex-col items-center gap-0.5 hover:text-slate-200 px-3 py-1 transition">
+        <i data-lucide="map" class="w-5 h-5"></i>
+        <span class="text-[10px]">Hazard Map</span>
+      </button>
+
+      <button onclick="switchTab('profile')" id="nav-btn-profile" class="flex flex-col items-center gap-0.5 hover:text-slate-200 px-3 py-1 transition">
+        <i data-lucide="user-check" class="w-5 h-5"></i>
+        <span class="text-[10px]">Recovery</span>
+      </button>
+
+    </nav>
+
+  </div> <!-- End App Shell -->
+
+
+  <!-- MODALS & DIALOG OVERLAYS -->
+
+  <!-- 1. Post Need / Offer Modal -->
+  <div id="modal-post" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+        <h3 class="text-sm font-bold flex items-center gap-1.5">
+          <i data-lucide="plus-circle" class="w-4 h-4 text-brand-400"></i>
+          Create Community Posting
+        </h3>
+        <button onclick="closePostModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handlePostSubmit(event)" class="p-4 space-y-3">
+        <div>
+          <label class="text-xs font-bold text-slate-700">Posting Type</label>
+          <div class="grid grid-cols-2 gap-2 mt-1">
+            <label class="flex items-center justify-center gap-1.5 border border-slate-300 rounded-xl py-2 text-xs font-bold cursor-pointer text-slate-700 has-[:checked]:bg-red-50 has-[:checked]:border-emergency-500 has-[:checked]:text-emergency-700">
+              <input type="radio" name="post_type" value="need" checked class="hidden">
+              🚨 Request Help
+            </label>
+            <label class="flex items-center justify-center gap-1.5 border border-slate-300 rounded-xl py-2 text-xs font-bold cursor-pointer text-slate-700 has-[:checked]:bg-emerald-50 has-[:checked]:border-safety-500 has-[:checked]:text-safety-700">
+              <input type="radio" name="post_type" value="offer" class="hidden">
+              🤝 Offer Supplies / Skill
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-bold text-slate-700">Title / Key Resource</label>
+          <input type="text" id="post-title" required placeholder="e.g. Need 30 Sandbags or Offering 4x4 Truck" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-brand-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <div>
+            <label class="text-xs font-bold text-slate-700">Category</label>
+            <select id="post-category" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-brand-500">
+              <option value="Sandbags">⏳ Sandbags</option>
+              <option value="Storage">📦 Dry Storage</option>
+              <option value="Transport">🚚 Transport / Hauling</option>
+              <option value="Volunteers">⛑️ Volunteer Hands</option>
+              <option value="Medical">🏥 Medical Supplies</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-bold text-slate-700">Urgency Level</label>
+            <select id="post-urgency" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-800 focus:outline-none focus:border-brand-500">
+              <option value="Critical">🔴 Critical (&lt; 2 hrs)</option>
+              <option value="High">🟠 High (Today)</option>
+              <option value="Moderate">🟡 Moderate (24-48 hrs)</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-xs font-bold text-slate-700">Description & Details</label>
+          <textarea id="post-desc" rows="3" required placeholder="Specify location, quantity, access constraints..." class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs font-medium text-slate-800 focus:outline-none focus:border-brand-500"></textarea>
+        </div>
+
+        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-md">
+          Publish to Community Engine
+        </button>
+      </form>
+    </div>
+  </div>
+
+
+  <!-- 2. Respond / Match Direct Action Modal -->
+  <div id="modal-respond" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+        <h3 class="text-sm font-bold flex items-center gap-1.5">
+          <i data-lucide="hand-heart" class="w-4 h-4 text-safety-400"></i>
+          Respond to Posting
+        </h3>
+        <button onclick="closeRespondModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-3">
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <div class="text-[10px] uppercase text-slate-400 font-bold">Connecting With</div>
+          <div id="respond-author" class="text-xs font-extrabold text-slate-900">Author Name</div>
+          <p id="respond-item" class="text-xs text-brand-600 font-medium mt-0.5">Item requested</p>
+        </div>
+
+        <div>
+          <label class="text-xs font-bold text-slate-700">Direct Message / Offer Details</label>
+          <textarea id="respond-msg" rows="3" placeholder="I can bring 15 sandbags in my truck within 30 minutes..." class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl p-2.5 text-xs text-slate-800 focus:outline-none focus:border-brand-500"></textarea>
+        </div>
+
+        <button onclick="confirmMatchResponse()" class="w-full bg-safety-600 hover:bg-safety-700 text-white font-bold text-xs py-2.5 rounded-xl transition shadow-md">
+          Send Instant Match Request
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3. Emergency Action Alert Modal -->
+  <div id="modal-alert" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl border border-amber-300 overflow-hidden">
+      <div class="bg-amber-500 text-slate-950 p-4 flex items-center justify-between">
+        <h3 class="text-sm font-extrabold flex items-center gap-1.5">
+          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+          Flood Surge Advisory #04
+        </h3>
+        <button onclick="toggleAlertModal()" class="text-slate-950 hover:opacity-75">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-4 space-y-3 text-xs text-slate-700">
+        <p class="font-bold text-slate-900">Current Water Crest: +2.4m at Municipal Gauge #2</p>
+        <p>Peak surge expected between <strong>18:00 and 21:00 tonight</strong>. Businesses in Zone 4B are strongly urged to deploy lower-door sandbags and migrate electronics to elevation &gt; 1.5m.</p>
+        
+        <div class="bg-amber-50 p-2.5 rounded-xl border border-amber-200">
+          <div class="font-bold text-amber-900 mb-1">Recommended Action Steps:</div>
+          <ul class="list-disc list-inside space-y-1 text-amber-800 text-[11px]">
+            <li>Elevate heavy inventory using wooden pallets.</li>
+            <li>Connect secondary sump pumps to generator power.</li>
+            <li>Post any missing volunteer needs on FloodLink board now.</li>
+          </ul>
+        </div>
+
+        <button onclick="toggleAlertModal()" class="w-full bg-slate-900 text-white font-bold py-2 rounded-xl">
+          Acknowledge & Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. Notifications Drawer/Modal -->
+  <div id="modal-notifications" class="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden">
+    <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
+      <div class="bg-slate-900 text-white p-4 flex items-center justify-between">
+        <h3 class="text-sm font-bold flex items-center gap-1.5">
+          <i data-lucide="bell" class="w-4 h-4 text-brand-400"></i>
+          Recent System Alerts & Matches
+        </h3>
+        <button onclick="toggleNotificationsModal()" class="text-slate-400 hover:text-white">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-4 space-y-2.5 max-h-[380px] overflow-y-auto text-xs">
+        <div class="p-2.5 bg-brand-50 border border-brand-200 rounded-xl flex items-start space-x-2">
+          <div class="bg-brand-500 text-white p-1 rounded mt-0.5"><i data-lucide="check" class="w-3 h-3"></i></div>
+          <div>
+            <div class="font-bold text-slate-900">Volunteer Match Found!</div>
+            <p class="text-slate-600 mt-0.5">Marcus (Logistics Specialist) accepted your request for Sandbags.</p>
+            <span class="text-[10px] text-slate-400 font-mono">5 mins ago</span>
+          </div>
+        </div>
+
+        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl flex items-start space-x-2">
+          <div class="bg-amber-500 text-white p-1 rounded mt-0.5"><i data-lucide="alert-circle" class="w-3 h-3"></i></div>
+          <div>
+            <div class="font-bold text-slate-900">Checklist Reminder</div>
+            <p class="text-slate-600 mt-0.5">Sandbag barrier installation task is still marked pending.</p>
+            <span class="text-[10px] text-slate-400 font-mono">1 hour ago</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- JAVASCRIPT APPLICATION ENGINE -->
+  <script>
+    /* ==========================================================================
+       APP STATE MANAGEMENT
+       ========================================================================== */
+    const state = {
+      isAuthenticated: false,
+      user: {
+        name: 'Harbor Brew Café',
+        role: 'business', // business, resident, volunteer, official
+        roleLabel: 'Small Business Owner',
+        email: 'harbor.brew@floodlink.org',
+        zone: 'Zone 4B',
+        elevation: 3.2,
+        distance: 180,
+        isGuest: false,
+        verified: true
+      },
+      currentTab: 'auth', // Starts on Screen 1: auth
+      authTab: 'login', // login, signup, reset
+      onboardStep: 1,
+      selectedOnboardRole: 'business',
+      prepareSubtab: 'checklists',
+      offline: false,
+      mapInitialized: false,
+      map: null,
+      mapLayers: {
+        shelters: true,
+        supplies: true,
+        hazards: true
+      },
+      checklists: [
+        { id: 1, text: 'Deploy door-frame sandbag barriers (minimum 3 tiers)', done: true, category: 'business' },
+        { id: 2, text: 'Upload updated insurance policy & asset inventory', done: true, category: 'business' },
+        { id: 3, text: 'Elevate lower-shelf electricals & ground inventory >1.5m', done: true, category: 'business' },
+        { id: 4, text: 'Test emergency sump pump & fuel generator backup', done: false, category: 'business' }
+      ],
+      matches: [
+        {
+          id: 1,
+          type: 'need',
+          author: 'Coastal Craft Bakery',
+          title: 'Dry Pallet & Box Storage Needed',
+          category: 'Storage',
+          urgency: 'Critical',
+          distance: '0.4 km',
+          desc: 'Bakery flour stock needs 4 dry pallet spaces for 48 hours to avoid floor water.',
+          time: '10m ago'
+        },
+        {
+          id: 2,
+          type: 'offer',
+          author: 'Marcus Vance (Volunteer)',
+          title: '4x4 Flatbed Truck Available for Sandbag Hauling',
+          category: 'Transport',
+          urgency: 'Moderate',
+          distance: '1.1 km',
+          desc: 'Can transport up to 50 sandbags per trip across Zone 4 flood points.',
+          time: '25m ago'
+        },
+        {
+          id: 3,
+          type: 'need',
+          author: 'Riverview Medical Clinic',
+          title: 'Portable Backup Generator (3kW+)',
+          category: 'Medical',
+          urgency: 'Critical',
+          distance: '0.8 km',
+          desc: 'Refrigerated vaccine storage requires immediate auxiliary power connection.',
+          time: '40m ago'
+        },
+        {
+          id: 4,
+          type: 'offer',
+          author: 'Red Cross Depot #3',
+          title: 'Emergency Clean-up Kits & Water Rations',
+          category: 'Volunteers',
+          urgency: 'High',
+          distance: '1.5 km',
+          desc: 'Free pick-up for flooded businesses & residents. Includes shovels & disinfectants.',
+          time: '1h ago'
+        }
+      ]
+    };
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      renderDynamicRoleFields('business');
+      renderChecklist();
+      renderMatchFeed();
+      initRiskChart();
+      updateAuthUIState();
+    });
+
+    function switchTab(tabId) {
+      // Security Check: If unauthenticated and trying to enter non-auth tab, prompt guest mode
+      if (!state.isAuthenticated && tabId !== 'auth') {
+        const proceed = confirm('You are currently not logged in. Would you like to enter as an Emergency Crisis Guest?');
+        if (proceed) {
+          handleEmergencyGuestLogin();
+        } else {
+          tabId = 'auth';
+        }
+      }
+
+      state.currentTab = tabId;
+
+      // Hide all screen sections
+      const screens = ['auth', 'dashboard', 'prepare', 'match', 'map', 'profile'];
+      screens.forEach(s => {
+        const screenEl = document.getElementById(`screen-${s}`);
+        if(screenEl) screenEl.classList.add('hidden');
+        
+        // Reset nav button styling
+        const btn = document.getElementById(`nav-btn-${s}`);
+        if(btn) {
+          btn.classList.remove('text-brand-400', 'font-bold');
+          btn.classList.add('text-slate-400');
+        }
+      });
+
+      // Show selected screen section
+      const activeScreen = document.getElementById(`screen-${tabId}`);
+      if(activeScreen) activeScreen.classList.remove('hidden');
+
+      // Highlight active nav button
+      const activeBtn = document.getElementById(`nav-btn-${tabId}`);
+      if(activeBtn) {
+        activeBtn.classList.add('text-brand-400', 'font-bold');
+        activeBtn.classList.remove('text-slate-400');
+      }
+
+      // Initialize map lazily when entering map tab
+      if (tabId === 'map' && !state.mapInitialized) {
+        setTimeout(initMap, 150);
+      }
+
+      // Re-trigger icon rendering
+      setTimeout(() => lucide.createIcons(), 50);
+    }
+
+    function switchAuthTab(mode) {
+      state.authTab = mode;
+      
+      const tabs = ['login', 'signup', 'reset'];
+      tabs.forEach(t => {
+        const btn = document.getElementById(`auth-tab-${t}`);
+        const form = document.getElementById(`auth-form-${t}`);
+        if (btn) btn.classList.remove('custom-auth-tab-active');
+        if (form) form.classList.add('hidden');
+      });
+
+      const activeBtn = document.getElementById(`auth-tab-${mode}`);
+      const activeForm = document.getElementById(`auth-form-${mode}`);
+      if (activeBtn) activeBtn.classList.add('custom-auth-tab-active');
+      if (activeForm) activeForm.classList.remove('hidden');
+    }
+
+    function selectOnboardRole(roleKey) {
+      state.selectedOnboardRole = roleKey;
+      const roles = ['business', 'resident', 'volunteer', 'official'];
+
+      roles.forEach(r => {
+        const card = document.getElementById(`role-card-${r}`);
+        const check = document.getElementById(`role-check-${r}`);
+        if (card) {
+          card.classList.remove('border-2', 'border-brand-500', 'bg-brand-50/50');
+          card.classList.add('border', 'border-slate-200');
+        }
+        if (check) check.classList.add('hidden');
+      });
+
+      const selectedCard = document.getElementById(`role-card-${roleKey}`);
+      const selectedCheck = document.getElementById(`role-check-${roleKey}`);
+      if (selectedCard) {
+        selectedCard.classList.remove('border', 'border-slate-200');
+        selectedCard.classList.add('border-2', 'border-brand-500', 'bg-brand-50/50');
+      }
+      if (selectedCheck) selectedCheck.classList.remove('hidden');
+
+      renderDynamicRoleFields(roleKey);
+    }
+
+    function renderDynamicRoleFields(roleKey) {
+      const container = document.getElementById('dynamic-role-fields');
+      if (!container) return;
+
+      if (roleKey === 'business') {
+        container.innerHTML = `
+          <div>
+            <label class="text-xs font-bold text-slate-700">Business / Shop Name</label>
+            <input type="text" id="setup-name" required value="Harbor Brew Café" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800 focus:outline-none focus:border-brand-500">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-bold text-slate-700">Zone / District</label>
+              <input type="text" id="setup-zone" required value="Zone 4B" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800">
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-700">Elevation (Meters)</label>
+              <input type="number" step="0.1" id="setup-elev" required value="3.2" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800">
+            </div>
+          </div>
+        `;
+      } else if (roleKey === 'resident') {
+        container.innerHTML = `
+          <div>
+            <label class="text-xs font-bold text-slate-700">Resident / Family Name</label>
+            <input type="text" id="setup-name" required placeholder="Elena Rostova" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-bold text-slate-700">Residential Zone</label>
+              <input type="text" id="setup-zone" required placeholder="Zone 2A" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800">
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-700">Household Count</label>
+              <input type="number" id="setup-elev" required value="4" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800">
+            </div>
+          </div>
+        `;
+      } else if (roleKey === 'volunteer') {
+        container.innerHTML = `
+          <div>
+            <label class="text-xs font-bold text-slate-700">Volunteer Full Name</label>
+            <input type="text" id="setup-name" required placeholder="David Chen (Logistics)" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-bold text-slate-700">Primary Skill</label>
+              <select class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-2 text-xs font-medium text-slate-800">
+                <option>🚚 Transport & Hauling</option>
+                <option>⛑️ Sandbag Deployment</option>
+                <option>🏥 Medical First Aid</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-700">Vehicle Type</label>
+              <input type="text" id="setup-zone" required placeholder="4x4 Pickup Truck" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800">
+            </div>
+          </div>
+        `;
+      } else if (roleKey === 'official') {
+        container.innerHTML = `
+          <div>
+            <label class="text-xs font-bold text-slate-700">Agency / Organization Name</label>
+            <input type="text" id="setup-name" required placeholder="Red Cross District Officer" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800">
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="text-xs font-bold text-slate-700">Jurisdiction</label>
+              <input type="text" id="setup-zone" required placeholder="Municipal Metro" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800">
+            </div>
+            <div>
+              <label class="text-xs font-bold text-slate-700">Badge / NGO ID #</label>
+              <input type="text" required placeholder="NGO-8820" class="w-full mt-1 bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-medium text-slate-800">
+            </div>
+          </div>
+        `;
+      }
+      lucide.createIcons();
+    }
+
+    function goToOnboardStep(step) {
+      state.onboardStep = step;
+      const step1 = document.getElementById('onboard-step-1');
+      const step2 = document.getElementById('onboard-step-2');
+      const title = document.getElementById('onboard-step-title');
+      const desc = document.getElementById('onboard-step-desc');
+      const badge = document.getElementById('onboard-step-badge');
+
+      if (step === 1) {
+        step1.classList.remove('hidden');
+        step2.classList.add('hidden');
+        title.innerText = 'Step 1: Select Your Resilience Role';
+        desc.innerText = 'Customize your dashboard & disaster toolkit';
+        badge.innerText = '1 of 2';
+      } else {
+        step1.classList.add('hidden');
+        step2.classList.remove('hidden');
+        title.innerText = 'Step 2: Profile & Property Details';
+        desc.innerText = 'Localized flood risk & coordination setup';
+        badge.innerText = '2 of 2';
+      }
+    }
+
+    function completeAuthentication(userData) {
+      state.isAuthenticated = true;
+      state.user = { ...state.user, ...userData };
+
+      updateAuthUIState();
+      switchTab('dashboard');
+
+      // Re-trigger icon rendering
+      setTimeout(() => lucide.createIcons(), 100);
+    }
+
+    function handleStandardLogin(e) {
+      e.preventDefault();
+      const email = document.getElementById('login-email').value;
+      
+      completeAuthentication({
+        email: email,
+        name: email.includes('harbor') ? 'Harbor Brew Café' : 'Coastal Business Partner',
+        role: 'business',
+        roleLabel: 'Small Business Owner',
+        verified: true,
+        isGuest: false
+      });
+    }
+
+    function handleSSOLogin(provider) {
+      completeAuthentication({
+        email: `user.${provider.toLowerCase()}@floodlink.org`,
+        name: `${provider} Authenticated User`,
+        role: 'resident',
+        roleLabel: 'Local Resident',
+        verified: true,
+        isGuest: false
+      });
+    }
+
+    function handleEmergencyGuestLogin() {
+      completeAuthentication({
+        name: 'Emergency Guest User',
+        role: 'business',
+        roleLabel: 'Rapid Crisis Access',
+        zone: 'Zone 4B Flood Area',
+        verified: false,
+        isGuest: true
+      });
+    }
+
+    function handleSignupSubmit(e) {
+      e.preventDefault();
+      const name = document.getElementById('setup-name')?.value || 'New Resilience User';
+      const zone = document.getElementById('setup-zone')?.value || 'Zone 4B';
+      const elev = parseFloat(document.getElementById('setup-elev')?.value) || 3.2;
+
+      let roleLabel = 'Small Business Owner';
+      if (state.selectedOnboardRole === 'resident') roleLabel = 'Local Resident';
+      if (state.selectedOnboardRole === 'volunteer') roleLabel = 'Certified Volunteer';
+      if (state.selectedOnboardRole === 'official') roleLabel = 'Official Aid Partner';
+
+      completeAuthentication({
+        name,
+        zone,
+        elevation: elev,
+        role: state.selectedOnboardRole,
+        roleLabel,
+        verified: true,
+        isGuest: false
+      });
+    }
+
+    function handleResetSubmit(e) {
+      e.preventDefault();
+      alert('Emergency password reset code dispatched to your phone/email.');
+      switchAuthTab('login');
+    }
+
+    function handleLogout() {
+      state.isAuthenticated = false;
+      state.user.isGuest = false;
+      updateAuthUIState();
+      switchTab('auth');
+      alert('You have logged out of the FloodLink portal.');
+    }
+
+    function updateAuthUIState() {
+      const headerStatus = document.getElementById('header-user-status');
+      const userPill = document.getElementById('logged-user-pill');
+      const notifBtn = document.getElementById('header-notifications-btn');
+      const logoutBtn = document.getElementById('header-logout-btn');
+
+      const roleBadge = document.getElementById('header-role-badge');
+      const userName = document.getElementById('header-user-name');
+
+      if (state.isAuthenticated) {
+        if(headerStatus) headerStatus.innerText = state.user.isGuest ? 'Crisis Mode Active' : 'Connected to Flood Net';
+        if(userPill) userPill.classList.remove('hidden');
+        if(notifBtn) notifBtn.classList.remove('hidden');
+        if(logoutBtn) logoutBtn.classList.remove('hidden');
+
+        if(roleBadge) roleBadge.innerText = state.user.role === 'business' ? 'Biz' : state.user.role === 'volunteer' ? 'Vol' : 'User';
+        if(userName) userName.innerText = state.user.name;
+
+        // Dashboard sync
+        const dashGreeting = document.getElementById('dashboard-user-greeting');
+        const dashSubtext = document.getElementById('dashboard-user-subtext');
+        const dashBadge = document.getElementById('dashboard-role-badge');
+
+        if (dashGreeting) dashGreeting.innerText = state.user.name;
+        if (dashSubtext) dashSubtext.innerText = `${state.user.zone} • Elevation ${state.user.elevation}m • River Basin Proximity: ${state.user.distance}m`;
+        if (dashBadge) dashBadge.innerText = state.user.roleLabel;
+
+        // Profile screen sync
+        const profName = document.getElementById('profile-name');
+        const profSubtext = document.getElementById('profile-subtext');
+        const profTag = document.getElementById('profile-role-tag');
+        const profAvatar = document.getElementById('profile-avatar');
+
+        if (profName) profName.innerText = state.user.name;
+        if (profSubtext) profSubtext.innerText = `Reg No: #BUS-${Math.floor(10000 + Math.random() * 90000)} • ${state.user.zone}`;
+        if (profTag) profTag.innerText = state.user.roleLabel;
+        if (profAvatar) profAvatar.innerText = state.user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() || 'FL';
+
+      } else {
+        if(headerStatus) headerStatus.innerText = 'Authentication Hub';
+        if(userPill) userPill.classList.add('hidden');
+        if(notifBtn) notifBtn.classList.add('hidden');
+        if(logoutBtn) logoutBtn.classList.add('hidden');
+      }
+    }
+
+    function toggleOfflineMode() {
+      state.offline = !state.offline;
+      const offlineBar = document.getElementById('offline-bar');
+      const wifiIcon = document.getElementById('wifi-icon');
+
+      if (state.offline) {
+        offlineBar.classList.remove('hidden');
+        wifiIcon.classList.remove('text-safety-500');
+        wifiIcon.classList.add('text-amber-500');
+      } else {
+        offlineBar.classList.add('hidden');
+        wifiIcon.classList.add('text-safety-500');
+        wifiIcon.classList.remove('text-amber-500');
+      }
+    }
+
+    function setPrepareSubtab(subtab) {
+      state.prepareSubtab = subtab;
+      const subtabs = ['checklists', 'vault', 'risk'];
+
+      subtabs.forEach(t => {
+        document.getElementById(`prep-content-${t}`).classList.add('hidden');
+        const btn = document.getElementById(`prep-subtab-${t}`);
+        btn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm', 'font-bold');
+        btn.classList.add('hover:text-slate-900');
+      });
+
+      document.getElementById(`prep-content-${subtab}`).classList.remove('hidden');
+      const activeBtn = document.getElementById(`prep-subtab-${subtab}`);
+      activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm', 'font-bold');
+    }
+
+    function renderChecklist() {
+      const container = document.getElementById('checklist-container');
+      if(!container) return;
+      container.innerHTML = '';
+
+      let completedCount = 0;
+
+      state.checklists.forEach(item => {
+        if(item.done) completedCount++;
+
+        const card = document.createElement('div');
+        card.className = `flex items-center justify-between p-3 rounded-xl border transition ${item.done ? 'bg-slate-50 border-slate-200 text-slate-500' : 'bg-white border-slate-300 text-slate-800 shadow-sm'}`;
+        card.innerHTML = `
+          <label class="flex items-center space-x-3 cursor-pointer w-full">
+            <input type="checkbox" ${item.done ? 'checked' : ''} onchange="toggleChecklistItem(${item.id})" class="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer">
+            <span class="text-xs font-semibold ${item.done ? 'line-through text-slate-400' : ''}">${item.text}</span>
+          </label>
+        `;
+        container.appendChild(card);
+      });
+
+      const total = state.checklists.length;
+      const pct = total > 0 ? Math.round((completedCount / total) * 100) : 0;
+      
+      const pctText = document.getElementById('checklist-percentage');
+      const countText = document.getElementById('checklist-count-text');
+      const readyScoreText = document.getElementById('ready-score-text');
+      const readyScoreBar = document.getElementById('ready-score-bar');
+
+      if (pctText) pctText.innerText = `${pct}%`;
+      if (countText) countText.innerText = `${completedCount} of ${total} Done`;
+      if (readyScoreText) readyScoreText.innerText = `${pct}%`;
+      if (readyScoreBar) readyScoreBar.style.width = `${pct}%`;
+    }
+
+    function toggleChecklistItem(id) {
+      const item = state.checklists.find(i => i.id === id);
+      if(item) {
+        item.done = !item.done;
+        renderChecklist();
+      }
+    }
+
+    function addCustomChecklistItem() {
+      const text = prompt('Enter custom preparedness action item:');
+      if (text && text.trim() !== '') {
+        state.checklists.push({
+          id: Date.now(),
+          text: text.trim(),
+          done: false,
+          category: 'custom'
+        });
+        renderChecklist();
+      }
+    }
+
+    let riskChartInstance = null;
+
+    function initRiskChart() {
+      const canvas = document.getElementById('riskChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      riskChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: ['12:00', '15:00', '18:00 (Surge Peak)', '21:00', '00:00'],
+          datasets: [
+            {
+              label: 'Predicted River Crest (m)',
+              data: [1.2, 1.8, 2.9, 2.4, 1.6],
+              borderColor: '#0284c7',
+              backgroundColor: 'rgba(2, 132, 199, 0.15)',
+              fill: true,
+              tension: 0.4
+            },
+            {
+              label: 'Your Shop Elevation (3.2m)',
+              data: [3.2, 3.2, 3.2, 3.2, 3.2],
+              borderColor: '#ef4444',
+              borderDash: [5, 5],
+              fill: false
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { boxWidth: 12, font: { size: 10 } } }
+          },
+          scales: {
+            y: { beginAtZero: true, ticks: { font: { size: 10 } } },
+            x: { ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    function recalculateRisk() {
+      const elev = parseFloat(document.getElementById('input-elevation').value) || 3.2;
+      const output = document.getElementById('risk-assessment-output');
+
+      if (elev < 2.8) {
+        output.className = 'bg-red-50 border border-red-200 rounded-xl p-3 mt-3 text-xs text-red-900';
+        output.innerHTML = `<strong>CRITICAL RISK:</strong> Elevation (${elev}m) is below predicted 2.9m flood peak. Immediate evacuation of ground inventory required!`;
+      } else if (elev < 3.5) {
+        output.className = 'bg-amber-50 border border-amber-200 rounded-xl p-3 mt-3 text-xs text-amber-900';
+        output.innerHTML = `<strong>MODERATE RISK:</strong> Elevation (${elev}m) is within 0.3m buffer of surge peak. Sandbag fortification and electrical elevation strongly advised.`;
+      } else {
+        output.className = 'bg-emerald-50 border border-emerald-200 rounded-xl p-3 mt-3 text-xs text-emerald-900';
+        output.innerHTML = `<strong>LOW DIRECT INUNDATION RISK:</strong> Elevation (${elev}m) is above peak. Prepare for potential access road closures and utility outages.`;
+      }
+
+      if (riskChartInstance) {
+        riskChartInstance.data.datasets[1].data = [elev, elev, elev, elev, elev];
+        riskChartInstance.data.datasets[1].label = `Your Elevation (${elev}m)`;
+        riskChartInstance.update();
+      }
+    }
+
+    let activeMatchFilter = 'all';
+    let activeCategoryFilter = 'all';
+
+    function renderMatchFeed() {
+      const container = document.getElementById('match-feed-container');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const filtered = state.matches.filter(m => {
+        const matchesType = activeMatchFilter === 'all' || m.type === activeMatchFilter;
+        const matchesCategory = activeCategoryFilter === 'all' || m.category === activeCategoryFilter;
+        return matchesType && matchesCategory;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="text-center py-8 text-xs text-slate-400">No postings matching current filter selection.</div>`;
+        return;
+      }
+
+      filtered.forEach(item => {
+        const isNeed = item.type === 'need';
+        const card = document.createElement('div');
+        card.className = `bg-white p-3.5 rounded-2xl border shadow-sm transition hover:shadow-md ${isNeed ? 'border-red-200/80' : 'border-emerald-200/80'}`;
+        
+        card.innerHTML = `
+          <div class="flex items-start justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="text-[9px] font-bold px-2 py-0.5 rounded uppercase ${isNeed ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'}">
+                ${isNeed ? '🚨 Request' : '🤝 Offer'}
+              </span>
+              <span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">${item.category}</span>
+              <span class="text-[10px] text-slate-400">• ${item.distance}</span>
+            </div>
+            <span class="text-[10px] text-slate-400">${item.time}</span>
+          </div>
+
+          <h3 class="text-xs font-bold text-slate-900 mt-2">${item.title}</h3>
+          <p class="text-xs text-slate-600 mt-1 leading-relaxed">${item.desc}</p>
+
+          <div class="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between">
+            <span class="text-[10px] text-slate-500 font-medium">Posted by: <strong class="text-slate-800">${item.author}</strong></span>
+            <button onclick="openRespondModal('${item.author}', '${item.title}')" class="text-xs font-semibold px-3 py-1 rounded-lg transition ${isNeed ? 'bg-emergency-500 hover:bg-emergency-600 text-white' : 'bg-safety-600 hover:bg-safety-700 text-white'}">
+              ${isNeed ? 'Offer Help' : 'Request Resource'}
+            </button>
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function filterMatchTab(type) {
+      activeMatchFilter = type;
+      ['all', 'needs', 'offers'].forEach(t => {
+        const btn = document.getElementById(`match-tab-${t}`);
+        if(btn) {
+          btn.classList.remove('bg-white', 'text-slate-900', 'shadow-sm', 'font-bold');
+        }
+      });
+      const activeBtn = document.getElementById(`match-tab-${type === 'need' ? 'needs' : type === 'offer' ? 'offers' : 'all'}`);
+      if(activeBtn) activeBtn.classList.add('bg-white', 'text-slate-900', 'shadow-sm', 'font-bold');
+      
+      renderMatchFeed();
+    }
+
+    function setMatchFilter(type) {
+      filterMatchTab(type);
+    }
+
+    function filterCategory(cat) {
+      activeCategoryFilter = cat;
+      renderMatchFeed();
+    }
+
+    /* Modal Handlers */
+    function openPostModal() {
+      document.getElementById('modal-post').classList.remove('hidden');
+    }
+    function closePostModal() {
+      document.getElementById('modal-post').classList.add('hidden');
+    }
+
+    function handlePostSubmit(e) {
+      e.preventDefault();
+      const type = document.querySelector('input[name="post_type"]:checked').value;
+      const title = document.getElementById('post-title').value;
+      const category = document.getElementById('post-category').value;
+      const urgency = document.getElementById('post-urgency').value;
+      const desc = document.getElementById('post-desc').value;
+
+      state.matches.unshift({
+        id: Date.now(),
+        type,
+        author: state.user.name,
+        title,
+        category,
+        urgency,
+        distance: '0.1 km',
+        desc,
+        time: 'Just now'
+      });
+
+      renderMatchFeed();
+      closePostModal();
+      alert('Your posting has been published live to the FloodLink matching engine!');
+    }
+
+    function openRespondModal(author, item) {
+      document.getElementById('respond-author').innerText = author;
+      document.getElementById('respond-item').innerText = item;
+      document.getElementById('modal-respond').classList.remove('hidden');
+    }
+    function closeRespondModal() {
+      document.getElementById('modal-respond').classList.add('hidden');
+    }
+
+    function confirmMatchResponse() {
+      closeRespondModal();
+      alert('Match Request Sent! The requester has received your contact details and message.');
+    }
+
+    function toggleAlertModal() {
+      document.getElementById('modal-alert').classList.toggle('hidden');
+    }
+
+    function toggleNotificationsModal() {
+      document.getElementById('modal-notifications').classList.toggle('hidden');
+    }
+
+    function initMap() {
+      state.mapInitialized = true;
+
+      const map = L.map('map').setView([14.6333, 121.0980], 14);
+      state.map = map;
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(map);
+
+      // Add Flood Inundation Polygon
+      L.polygon([
+        [14.6380, 121.0920],
+        [14.6360, 121.1040],
+        [14.6280, 121.1010],
+        [14.6310, 121.0900]
+      ], {
+        color: '#0284c7',
+        fillColor: '#38bdf8',
+        fillOpacity: 0.35
+      }).addTo(map).bindPopup("<b>Zone 4B Flood Inundation Polygon</b><br>Estimated depth: 0.4m - 1.1m");
+
+      const shelters = [
+        { coords: [14.6350, 121.0950], title: "Civic Center Shelter", capacity: "120 beds open" },
+        { coords: [14.6290, 121.1020], title: "East High School Gym", capacity: "45 beds open" }
+      ];
+
+      const supplies = [
+        { coords: [14.6320, 121.0910], title: "Red Cross Sandbag Depot", desc: "Sandbags & shovels available" }
+      ];
+
+      const hazards = [
+        { coords: [14.6340, 121.0990], title: "River Bridge Road Closed", desc: "Submerged under 0.6m water" }
+      ];
+
+      shelters.forEach(s => {
+        L.circleMarker(s.coords, { radius: 9, fillColor: '#3b82f6', color: '#ffffff', weight: 2, fillOpacity: 0.9 })
+          .addTo(map)
+          .bindPopup(`<b>🏠 ${s.title}</b><br>${s.capacity}`);
+      });
+
+      supplies.forEach(s => {
+        L.circleMarker(s.coords, { radius: 9, fillColor: '#10b981', color: '#ffffff', weight: 2, fillOpacity: 0.9 })
+          .addTo(map)
+          .bindPopup(`<b>📦 ${s.title}</b><br>${s.desc}`);
+      });
+
+      hazards.forEach(h => {
+        L.circleMarker(h.coords, { radius: 9, fillColor: '#ef4444', color: '#ffffff', weight: 2, fillOpacity: 0.9 })
+          .addTo(map)
+          .bindPopup(`<b>🚧 ${h.title}</b><br>${h.desc}`);
+      });
+    }
+
+    function toggleMapLayer(layerKey) {
+      state.mapLayers[layerKey] = !state.mapLayers[layerKey];
+      const btn = document.getElementById(`layer-btn-${layerKey}`);
+      if(state.mapLayers[layerKey]) {
+        btn.classList.add('opacity-100');
+        btn.classList.remove('opacity-40');
+      } else {
+        btn.classList.add('opacity-40');
+        btn.classList.remove('opacity-100');
+      }
+    }
+
+    function simulateUpload(input) {
+      if (input.files && input.files[0]) {
+        const file = input.files[0];
+        const vaultList = document.getElementById('vault-list');
+
+        const card = document.createElement('div');
+        card.className = 'flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200';
+        card.innerHTML = `
+          <div class="flex items-center space-x-2.5">
+            <div class="bg-brand-100 text-brand-600 p-2 rounded-lg">
+              <i data-lucide="file" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <div class="text-xs font-bold text-slate-800">${file.name}</div>
+              <p class="text-[10px] text-slate-500">Just uploaded • ${(file.size/1024/1024).toFixed(2)} MB • Encrypted</p>
+            </div>
+          </div>
+          <button onclick="alert('Viewing document')" class="text-xs text-brand-600 font-semibold hover:underline">View</button>
+        `;
+        vaultList.appendChild(card);
+        lucide.createIcons();
+        alert(`Document "${file.name}" safely stored in encrypted offline vault!`);
+      }
+    }
+
+    function calculateDamageReport() {
+      const struct = parseFloat(document.getElementById('damage-struct').value) || 0;
+      const inv = parseFloat(document.getElementById('damage-inv').value) || 0;
+      const total = struct + inv;
+
+      alert(`Official Loss Assessment Summary Generated:\nTotal Estimated Damage: $${total.toLocaleString()}\nReport format ready for SBA / FEMA claim filing.`);
+    }
+  </script>
+</body>
+</html>
